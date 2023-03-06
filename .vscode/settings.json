@@ -1,0 +1,6 @@
+{
+    "terminal.integrated.env.linux": {
+        "BASH_INIT_COMMAND": "/home/jem/bin/dev-environment-setup.sh"
+    },
+    "terminal.integrated.defaultProfile.linux": "bash",
+}

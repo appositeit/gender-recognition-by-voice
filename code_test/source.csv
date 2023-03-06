@@ -1,0 +1,5 @@
+filename,text,up_votes,down_votes,age,gender,accent,duration
+cv-valid-test/sample-000000.mp3,without the dataset the article is useless,1,0,,,,
+cv-valid-test/sample-000001.mp3,i've got to go to him,1,0,twenties,male,,
+cv-valid-test/sample-000002.mp3,and you know it,1,0,,,,
+cv-valid-test/sample-000003.mp3,down below in the darkness were hundreds of people sleeping in peace,4,0,twenties,male,us,

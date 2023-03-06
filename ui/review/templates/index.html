@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Overview{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div>
+
+<table>
+<hr>
+<th><a href='?sort=id{% if sort=="id" %}&order={{ order }}{% endif %}'>Key</a></th>
+  <th><a href='?sort=filename{% if sort=="filename" %}&order={{ order }}{% endif %}'>Name</a></th>
+  <th><a href='?sort=male{% if sort=="male" %}&order={{ order }}{% endif %}'>Gender</a></th>
+  <th><a href='?sort=frequency{% if sort=="frequency" %}&order={{ order }}{% endif %}'>Frequency</a></th>
+  <th><a href='?sort=confidence{% if sort=="confidence" %}&order={{ order }}{% endif %}'>Confidence</a></th>
+  <th>Audio</th>
+
+</hr>
+{% for sample in samples %}
+<tr class="{% if sample['male'] %}male{% else %}female{% endif %}">
+  <td>{{ sample['id'] }}</td>
+  <td>{{sample['name']}}</td>
+  <td>
+    {% if sample['male'] %}
+      Male
+    {% else %}
+      Female
+    {% endif %}
+  </td>
+  <td>{{ '%0.2f' % (sample['frequency'])|float }}Hz</td>
+  <td>{{ '%0.2f' % (100*sample['confidence'])|float }}%</td>
+  <td>
+    <audio controls>
+      <source src="{{sample['url']}}" type="audio/wav">
+    </audio>
+  </td>
+</tr>
+{% endfor %}
+{% endblock %}

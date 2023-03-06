@@ -3,14 +3,24 @@ import os
 import wave
 import librosa
 import numpy as np
+import tqdm
+
 from sys import byteorder
 from array import array
 from struct import pack
+from tensorflow.keras.models import load_model
+import warnings
+warnings.filterwarnings('ignore', message='Unable to register cuBLAS factory:')
+warnings.filterwarnings('ignore', message='E tensorflow/stream_executor/cuda/cuda_blas.cc:2981]')
 
+import training_data
+import vggish_input
+import data_schema
 
 THRESHOLD = 500
 CHUNK_SIZE = 1024
-FORMAT = pyaudio.paInt16
+#  FORMAT = pyaudio.paInt16
+FORMAT = 4  # pyaudio.paInt24
 RATE = 16000
 
 SILENCE = 30
@@ -62,11 +72,11 @@ def add_silence(snd_data, seconds):
 
 def record():
     """
-    Record a word or words from the microphone and 
+    Record a word or words from the microphone and
     return the data as an array of signed shorts.
-    Normalizes the audio, trims silence from the 
-    start and end, and pads with 0.5 seconds of 
-    blank sound to make sure VLC et al can play 
+    Normalizes the audio, trims silence from the
+    start and end, and pads with 0.5 seconds of
+    blank sound to make sure VLC et al can play
     it without getting chopped off.
     """
     p = pyaudio.PyAudio()
@@ -159,20 +169,57 @@ def extract_feature(file_name, **kwargs):
     return result
 
 
-if __name__ == "__main__":
-    # load the saved model (after training)
-    # model = pickle.load(open("result/mlp_classifier.model", "rb"))
-    from utils import load_data, split_data, create_model
+def test_fileset(model_file, pset):
+    '''This tests a training data set using the model and stores the test results in the
+    "test" table, both original and new outcome. This will be used by a UI to allow the user
+    to explore why particular audio samples are failing classification.'''
+
+    tester = ModelTester(model_file=model_file)
+    batch_size = 1000
+    pdd, pdm = training_data.make_p_parameters('raw22', pset)
+
+    # Load valid samples from the data schema
+    gdb = data_schema.GenderDB(pdm)
+    samples = gdb.read_valid_samples()
+
+    test_run = {
+        'model_filename': model_file,
+    }
+    test_run_id = gdb.add_test_run(test_run)
+
+    features = []
+    tests = []
+
+    for i, sample in tqdm.tqdm(enumerate(samples), 'Testing samples', total=len(samples)):
+    # for i, sample in enumerate(samples):
+        audio, sr = librosa.load(sample.filename)
+        features = vggish_input.waveform_to_examples(audio, sr)
+        features = np.array(features).reshape((1,1,96,64))
+        test_male = tester.test(features)
+        test = {
+            'test_run_id': test_run_id,
+            'sample_id': sample.id,
+            'sample_male': sample.male,
+            'test_male': test_male
+        }
+        tests.append(test)
+
+        if i % batch_size == 0: 
+            gdb.add_tests(tests)
+            tests = []
+
+    gdb.add_tests(tests)
+
+
+def interactive():
     import argparse
-    parser = argparse.ArgumentParser(description="""Gender recognition script, this will load the model you trained, 
-                                    and perform inference on a sample you provide (either using your voice or a file)""")
+    parser = argparse.ArgumentParser(description='''Gender recognition script, this will load the model you trained,
+                                    and perform inference on a sample you provide (either using your voice or a file)''')
+    parser.add_argument("-m", "--model", help="The path to the saved model file")
     parser.add_argument("-f", "--file", help="The path to the file, preferred to be in WAV format")
     args = parser.parse_args()
+
     file = args.file
-    # construct the model
-    model = create_model()
-    # load the saved/trained weights
-    model.load_weights("results/model.h5")
     if not file or not os.path.isfile(file):
         # if file not provided, or it doesn't exist, use your voice
         print("Please talk")
@@ -181,11 +228,46 @@ if __name__ == "__main__":
         # record the file (start talking)
         record_to_file(file)
     # extract features and reshape it
-    features = extract_feature(file, mel=True).reshape(1, -1)
-    # predict the gender!
-    male_prob = model.predict(features)[0][0]
+    # features = extract_feature(file, mel=True).reshape(1, -1)
+    audio, sr = librosa.load(file)
+    features = vggish_input.waveform_to_examples(audio, sr)
+    features = np.array(features).reshape((1,1,96,64))
+
+    tester = ModelTester('vgg2')
+    male_prob = tester.test(features)
+    # show the result!
+    # print("Result:", gender)
     female_prob = 1 - male_prob
     gender = "male" if male_prob > female_prob else "female"
-    # show the result!
-    print("Result:", gender)
-    print(f"Probabilities:     Male: {male_prob*100:.2f}%    Female: {female_prob*100:.2f}%")
+    print(f"Male: {male_prob}\tFemale: {female_prob}")
+
+
+class ModelTester:
+    
+    def __init__(self, model_label=None, model_file=None):
+        # load the saved model (after training)
+        # model = pickle.load(open("result/mlp_classifier.model", "rb"))
+        if model_label:
+            model_files, model_creator = training_data.list_models_and_creator(model_label)
+            model_file = model_files[0]
+
+            if model_creator:
+                # construct the model
+                self.model = model_creator()
+                # load the saved/trained weights
+                self.model.load_weights(model_files[1])
+
+        self.model = load_model(model_file)
+
+    def test(self, features):
+        # predict the gender!
+        # male_prob = model.predict(features)[0][0]
+        return self.model(features, training=False)[0][0]
+
+def main():
+    model_file = '/mnt/fastest/jem/ml/training_data/models/by_run/wise-rain-110.h5'
+    test_fileset(model_file, 'test')
+
+
+if __name__ == "__main__":
+    main()

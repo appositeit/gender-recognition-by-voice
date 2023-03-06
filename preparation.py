@@ -1,10 +1,16 @@
 import glob
 import os
+
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import pandas as pd
 import numpy as np
 import shutil
 import librosa
 from tqdm import tqdm
+
+
 
 
 def extract_feature(file_name, **kwargs):
@@ -63,7 +69,7 @@ for j, csv_file in enumerate(csv_files):
     new_df = new_df[np.logical_or(new_df['gender'] == 'female', new_df['gender'] == 'male')]
     print("Now:", len(new_df), "rows")
     new_csv_file = os.path.join(dirname, csv_file)
-    # save new preprocessed CSV 
+    # save new preprocessed CSV
     new_df.to_csv(new_csv_file, index=False)
     # get the folder name
     folder_name, _ = csv_file.split(".")

@@ -1,0 +1,12 @@
+code_test/processed/
+logs/
+t/
+wandb/
+data/
+pyaudio/
+results/                                                                                  
+test-samples/
+__pycache__
+convert_ckpt.py
+*.h5
+*.sql
